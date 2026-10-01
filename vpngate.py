@@ -460,7 +460,7 @@ EDGE_HOSTS = [
     h.strip()
     for h in os.environ.get(
         "EDGE_HOSTS",
-        "images.chesscomfiles.com:443,yong.880805.xyz:443,www.carousell.sg:443,www.shopify,com:443,emos.prlo.de:443,academy.7shifts.com:443,www.zendesk.com:443,jobsdb.com:443,themeisle.com:443,auto.dolby.dpdns.org:443,www.udacity.com:443,mokeedev.com:443,53.fs1.hubspotusercontent-na1.net:443,api.gzcrtw.com:443,www.jp.pima.gov:443,serviceshub.samsclub.com:443,email.lg.com:443,www.giannidelprete.it:443,dynadot.com:443,cdn.555586.xyz:443,cloudflare.idc.rocks:443,www.blibli.com:443,staticdelivery.nexusmods.com:443,linear.app:443,markmonitor.com:443,spring.io:443,www.sage.com:443,224322.xyz:443,mfa.gov.ua:443",
+        "2.27.132.160:8443,64.120.121.89:2053,38.147.190.29:443,207.57.124.108:443,151.245.90.96:8443,219.76.13.166:443,149.104.31.208:443,205.189.160.50:443,156.226.168.206:443,8.218.22.14:443,207.57.135.204:8443,8.210.29.68:443,209.33.161.104:443,43.129.80.179:8443,45.136.14.61:2053,156.239.245.134:443,219.76.13.181:443,82.27.116.181:443,156.224.77.87:443,45.221.113.58:8443,2.27.109.35:443,103.97.200.42:443,178.83.206.103:443,85.121.245.104:443,154.16.10.93:443,45.145.228.222:443,43.159.1.170:443,103.101.0.73:443,68.64.178.42:443,198.20.133.86:443,139.28.169.72:443,103.143.81.178:443,91.213.186.115:443,219.76.13.177:443,96.9.228.241:443,68.64.179.129:443,185.206.171.53:443,",
     ).split(",")
     if h.strip()
 ]
