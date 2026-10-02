@@ -51,7 +51,7 @@ VPNGATE_MIRROR = os.environ.get(
     "https://raw.githubusercontent.com/fdciabdul/Vpngate-Scraper-API/main/json/data.json",
 )
 # 已部署的 Cloudflare Worker 检测接口 (GET /check?proxyip=host:port, 实测确认)
-WORKER_CHECK_URL = os.environ.get("CHECK_WORKER", "https://check.helei.kdns.fr/check?sstp=vpn:vpn@")
+WORKER_CHECK_URL = os.environ.get("CHECK_WORKER", "https://polished-1001.wuhales.ccwu.cc/check?sstp=vpn:vpn@")
 CONCURRENCY = max(1, int(os.environ.get("CHECK_CONCURRENCY", "32")))   # 与 Worker 网页端一致的并发模型
 CHECK_TIMEOUT = float(os.environ.get("CHECK_TIMEOUT", "90"))          # 单请求客户端超时 (秒)
 MAX_CHECK_NODES = int(os.environ.get("MAX_CHECK_NODES", "0"))         # 0=不限; 本地测试可设小值
@@ -460,8 +460,7 @@ EDGE_HOSTS = [
     h.strip()
     for h in os.environ.get(
         "EDGE_HOSTS",
-        "saas.072159.xyz:443,hzytjy.cn:443,ali.nonull.pp.ua:443,auto.dolby.dpdns.org:443,"
-        "cdn.cnno.de:443,saas.sin.fan:443,cf.777791.xyz:443",
+        "45.192.201.197:443,103.53.80.239:443,43.165.191.60:443,172.237.1.32:443,124.156.208.160:443,13.231.221.179:443,139.162.70.21:443,139.162.72.62:443,14.137.237.104:8443,14.137.237.102:8443,14.137.237.103:8443,13.158.71.221:443,172.104.120.92:443,3.112.67.101:443,216.23.87.50:443,64.83.39.176:443,18.181.170.52:443,103.47.186.135:443,172.104.81.253:443,35.78.169.69:443,172.237.6.212:443,43.167.11.157:2083,172.238.19.239:443,216.23.84.115:443,13.158.86.30:443,14.137.237.101:8443,172.237.5.239:443,45.143.235.120:443,87.76.190.244:443,141.147.174.243:443,172.104.77.231:443,161.33.172.160:443,161.33.138.142:443,212.135.215.72:443,172.238.18.137:443,172.237.6.18:443,35.79.170.43:443,172.104.80.248:443,104.105.138.244:443,178.214.214.53:443,13.158.39.80:443,13.114.101.22:443,178.214.214.56:443,138.2.10.165:443,45.192.201.140:443,69.8.128.82:443,13.115.139.162:443,138.3.209.71:2053,156.246.93.242:443,3.112.41.210:443,69.8.128.249:8443,172.237.5.76:443,175.41.232.194:443,5.34.220.81:443,126.78.133.130:443,103.27.187.162:8443,96.126.191.218:443,54.65.187.99:443,35.74.79.196:443",
     ).split(",")
     if h.strip()
 ]
@@ -522,8 +521,8 @@ def build_hosts_text(data):
 
 
 # edgetunnel 完整订阅 (vless://) 配置
-EDT_UUID = os.environ.get("EDT_UUID", "90c14586-42a5-4c30-959d-8b36608d67f7")
-EDT_DOMAIN = os.environ.get("EDT_DOMAIN", "ed.xiaolei.qzz.io")
+EDT_UUID = os.environ.get("EDT_UUID", "96ec276c-794b-4833-8803-e8fde5b83737")
+EDT_DOMAIN = os.environ.get("EDT_DOMAIN", "polished-1001.wxb.indevs.in")
 EDT_FINGERPRINT = os.environ.get("EDT_FINGERPRINT", "chrome")
 SUB_URL = os.environ.get("SUB_URL", "https://jerylihub.github.io/gate/sub.txt")
 
