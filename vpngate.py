@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
 """
-VPN Gate SSTP 节点检测流水线 (动态优选前置入口版)
+VPN Gate SSTP 节点检测流水线 (动态优选前置入口版 - 修复版)
 =====================================================
-流程:
-  1. 动态获取/加载优质 Cloudflare 优选 IP 作为前置入口池
-  2. 获取 VPN Gate 原始节点
-  3. 只保留带 TCP 入口的 SSTP 节点
-  4. 去重
-  5. 并发调用检测 Worker
-  6. 生成 public/data.json + public/index.html + public/nodes.txt
 """
 
 import base64
@@ -32,9 +25,6 @@ for _stream in (sys.stdout, sys.stderr):
     except Exception:
         pass
 
-# ---------------------------------------------------------------------------
-# 配置
-# ---------------------------------------------------------------------------
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))
 
 VPNGATE_API = os.environ.get("VPNGATE_API", "http://www.vpngate.net/api/iphone/")
@@ -81,9 +71,6 @@ COUNTRY_ZH = {
     "MN": "蒙古", "NP": "尼泊尔", "LK": "斯里兰卡", "MM": "缅甸",
 }
 
-# ---------------------------------------------------------------------------
-# 日志
-# ---------------------------------------------------------------------------
 _section = None
 
 def log(section, msg=""):
@@ -98,11 +85,7 @@ def die(msg):
     log("FATAL", f"[失败] {msg}")
     sys.exit(1)
 
-# ---------------------------------------------------------------------------
-# 动态加载前置入口 IP (Edge Hosts)
-# ---------------------------------------------------------------------------
 def get_dynamic_edge_hosts():
-    """优先读取环境变量，其次动态抓取最新优选 IP，最后使用保底 IP"""
     env_hosts = os.environ.get("EDGE_HOSTS", "").strip()
     if env_hosts:
         hosts = [h.strip() for h in env_hosts.split(",") if h.strip()]
@@ -110,7 +93,6 @@ def get_dynamic_edge_hosts():
             log("EDGE", f"从环境变量加载了 {len(hosts)} 个前置 IP")
             return hosts
 
-    # 公开的高质量优选 IP 来源 (可根据需要替换)
     dynamic_sources = [
         "https://raw.githubusercontent.com/XIU2/CloudflareSpeedTest/master/ip.txt",
     ]
@@ -131,14 +113,13 @@ def get_dynamic_edge_hosts():
                         valid_ips.append(ip_port)
                 
                 if valid_ips:
-                    selected = valid_ips[:30]  # 取前 30 个高质量 IP
+                    selected = valid_ips[:30]
                     random.shuffle(selected)
                     log("EDGE", f"成功动态加载了 {len(selected)} 个优选前置 IP")
                     return selected
         except Exception as exc:
             log("EDGE", f"动态获取优选 IP 失败: {exc}")
 
-    # 保底内置默认 IP 池
     log("EDGE", "使用内置保底前置 IP 池")
     return [
         "216.236.59.131:1891",
@@ -150,9 +131,6 @@ def get_dynamic_edge_hosts():
 EDGE_HOSTS = get_dynamic_edge_hosts()
 NODES_URL = os.environ.get("NODES_URL", "https://jerylihub.github.io/gate/nodes.txt")
 
-# ---------------------------------------------------------------------------
-# 数据抓取
-# ---------------------------------------------------------------------------
 def fetch_vpngate():
     try:
         log("VPN GATE", f"获取官方 API: {VPNGATE_API}")
@@ -229,9 +207,6 @@ def parse_mirror_json(data):
         rows.append({"host": host, "ip": ip, "country_long": str(s.get("countrylong") or s.get("country_long") or s.get("country") or "").strip(), "country_short": str(s.get("countryshort") or s.get("country_short") or "").strip(), "config_b64": str(s.get("openvpn_configdata_base64") or s.get("config_b64") or "").strip()})
     return rows
 
-# ---------------------------------------------------------------------------
-# 筛选 SSTP 节点
-# ---------------------------------------------------------------------------
 _PROTO_TCP_RE = re.compile(r"^proto\s+(tcp|tcp4|tcp6)\b", re.M)
 _REMOTE_RE = re.compile(r"^remote\s+\S+\s+(\d+)", re.M)
 
@@ -265,9 +240,6 @@ def dedupe(nodes):
         out.append(n)
     return out
 
-# ---------------------------------------------------------------------------
-# 检测 Worker
-# ---------------------------------------------------------------------------
 def classify_network(host, exit_org, is_datacenter=None):
     if is_datacenter is True: return "datacenter"
     if is_datacenter is False: return "residential"
@@ -324,9 +296,6 @@ def check_all(nodes, session):
             results.append(fut.result())
     return results
 
-# ---------------------------------------------------------------------------
-# 生成数据
-# ---------------------------------------------------------------------------
 def build_outputs(results, raw_count, sstp_count, source):
     available = [r for r in results if r.get("success")]
     countries = {}
@@ -347,7 +316,6 @@ def build_outputs(results, raw_count, sstp_count, source):
     return data
 
 def build_nodes_text(data):
-    """生成纯节点行版本 (无注释): 每行 = 入口地址#名字$sstp://..."""
     countries = data["countries"]
     _entry = os.environ.get("HOSTS_ENTRY", "").strip()
     edge = [e.strip() for e in _entry.split(",") if e.strip()] or EDGE_HOSTS
@@ -358,8 +326,8 @@ def build_nodes_text(data):
         code = str(grp.get("code") or "?").upper()
         zh = COUNTRY_ZH.get(code) or (code if code and code != "?" else cname)
         nodes = sorted(grp["nodes"], key=lambda n: (0 if n.get("residential") == "residential" else 1, n.get("latency_ms") is None, n.get("latency_ms") or 0, n.get("host") or ""))
-        res_nodes = [n for n in nodes if n.get("residential"] == "residential"]
-        dc_nodes = [n for n in nodes if n.get("residential"] != "residential"]
+        res_nodes = [n for n in nodes if n.get("residential") == "residential"]
+        dc_nodes = [n for n in nodes if n.get("residential") != "residential"]
         for i, n in enumerate(res_nodes, 1):
             entry = edge[idx % len(edge)]
             idx += 1
@@ -393,9 +361,6 @@ def write_outputs(data):
 
     return data_path, html_path, nodes_path
 
-# ---------------------------------------------------------------------------
-# main
-# ---------------------------------------------------------------------------
 def main():
     session = requests.Session()
     rows, source = fetch_vpngate()
