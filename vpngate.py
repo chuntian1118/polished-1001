@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-VPN Gate SSTP 节点检测流水线 (精简版)
-=====================================
+VPN Gate SSTP 节点检测流水线 (动态优选前置入口版)
+=====================================================
 流程:
-  1. 获取 VPN Gate 原始节点
-  2. 只保留带 TCP 入口的 SSTP 节点
-  3. 去重
-  4. 并发调用检测 Worker
-  5. 生成 public/data.json + public/index.html + public/nodes.txt
+  1. 动态获取/加载优质 Cloudflare 优选 IP 作为前置入口池
+  2. 获取 VPN Gate 原始节点
+  3. 只保留带 TCP 入口的 SSTP 节点
+  4. 去重
+  5. 并发调用检测 Worker
+  6. 生成 public/data.json + public/index.html + public/nodes.txt
 """
 
 import base64
@@ -15,6 +16,7 @@ import csv
 import io
 import json
 import os
+import random
 import re
 import sys
 import time
@@ -95,6 +97,58 @@ def log(section, msg=""):
 def die(msg):
     log("FATAL", f"[失败] {msg}")
     sys.exit(1)
+
+# ---------------------------------------------------------------------------
+# 动态加载前置入口 IP (Edge Hosts)
+# ---------------------------------------------------------------------------
+def get_dynamic_edge_hosts():
+    """优先读取环境变量，其次动态抓取最新优选 IP，最后使用保底 IP"""
+    env_hosts = os.environ.get("EDGE_HOSTS", "").strip()
+    if env_hosts:
+        hosts = [h.strip() for h in env_hosts.split(",") if h.strip()]
+        if hosts:
+            log("EDGE", f"从环境变量加载了 {len(hosts)} 个前置 IP")
+            return hosts
+
+    # 公开的高质量优选 IP 来源 (可根据需要替换)
+    dynamic_sources = [
+        "https://raw.githubusercontent.com/XIU2/CloudflareSpeedTest/master/ip.txt",
+    ]
+
+    for url in dynamic_sources:
+        try:
+            log("EDGE", f"正在动态获取最新优选 IP: {url}")
+            resp = requests.get(url, timeout=10)
+            if resp.status_code == 200:
+                lines = resp.text.splitlines()
+                valid_ips = []
+                for line in lines:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        ip_port = line.split("#")[0].strip()
+                        if ":" not in ip_port:
+                            ip_port = f"{ip_port}:443"
+                        valid_ips.append(ip_port)
+                
+                if valid_ips:
+                    selected = valid_ips[:30]  # 取前 30 个高质量 IP
+                    random.shuffle(selected)
+                    log("EDGE", f"成功动态加载了 {len(selected)} 个优选前置 IP")
+                    return selected
+        except Exception as exc:
+            log("EDGE", f"动态获取优选 IP 失败: {exc}")
+
+    # 保底内置默认 IP 池
+    log("EDGE", "使用内置保底前置 IP 池")
+    return [
+        "216.236.59.131:1891",
+        "216.236.59.133:1891",
+        "216.236.59.134:1891",
+        "216.236.59.135:1891",
+    ]
+
+EDGE_HOSTS = get_dynamic_edge_hosts()
+NODES_URL = os.environ.get("NODES_URL", "https://jerylihub.github.io/gate/nodes.txt")
 
 # ---------------------------------------------------------------------------
 # 数据抓取
@@ -292,19 +346,6 @@ def build_outputs(results, raw_count, sstp_count, source):
     data = {"generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"), "source": source, "worker": WORKER_CHECK_URL, "stats": stats, "countries": by_country, "available": available}
     return data
 
-# edgetunnel 入口地址池
-EDGE_HOSTS = [
-    h.strip()
-    for h in os.environ.get(
-        "EDGE_HOSTS",
-        "216.236.59.131:1891,216.236.59.133:1891,216.236.59.134:1891,216.236.59.135:1891,216.236.59.137:1891,216.236.59.138:1891,"
-        "216.236.59.139:1891,216.236.59.140:1891,216.236.59.141:1891,216.236.59.142:1891,216.236.59.143:1891,216.236.59.144:1891,"
-        "216.236.59.145:1891,216.236.59.146:1891,216.236.59.147:1891,216.236.59.148:1891,216.236.59.149:1891",
-    ).split(",")
-    if h.strip()
-]
-NODES_URL = os.environ.get("NODES_URL", "https://chuntian1118.github.io/gate/nodes.txt")
-
 def build_nodes_text(data):
     """生成纯节点行版本 (无注释): 每行 = 入口地址#名字$sstp://..."""
     countries = data["countries"]
@@ -317,8 +358,8 @@ def build_nodes_text(data):
         code = str(grp.get("code") or "?").upper()
         zh = COUNTRY_ZH.get(code) or (code if code and code != "?" else cname)
         nodes = sorted(grp["nodes"], key=lambda n: (0 if n.get("residential") == "residential" else 1, n.get("latency_ms") is None, n.get("latency_ms") or 0, n.get("host") or ""))
-        res_nodes = [n for n in nodes if n.get("residential") == "residential"]
-        dc_nodes = [n for n in nodes if n.get("residential") != "residential"]
+        res_nodes = [n for n in nodes if n.get("residential"] == "residential"]
+        dc_nodes = [n for n in nodes if n.get("residential"] != "residential"]
         for i, n in enumerate(res_nodes, 1):
             entry = edge[idx % len(edge)]
             idx += 1
